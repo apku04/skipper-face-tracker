@@ -820,7 +820,27 @@ class DualCameraTracker:
         return frame
     
     def get_combined_frame(self):
-        """Get side-by-side combined frame"""
+        """Get side-by-side combined frame (or single camera frame)"""
+        num_cameras = len(self.camera_nums)
+        
+        # Single camera mode
+        if num_cameras == 1:
+            if self.latest_frames[0] is None:
+                blank = np.zeros((CAMERA_HEIGHT, CAMERA_WIDTH, 3), dtype=np.uint8)
+                cv2.putText(blank, "Waiting for camera...", (CAMERA_WIDTH//4, CAMERA_HEIGHT//2),
+                           cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                return blank
+            
+            frame = self.latest_frames[0].copy()
+            
+            # Add FPS overlay
+            cv2.putText(frame, f"Cam{self.camera_nums[0]}: {self.fps_list[0]:.1f}fps", 
+                       (10, CAMERA_HEIGHT-40),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+            
+            return frame
+        
+        # Dual camera mode
         if self.latest_frames[0] is None or self.latest_frames[1] is None:
             # Return blank frame until both cameras ready
             blank = np.zeros((CAMERA_HEIGHT, CAMERA_WIDTH*2, 3), dtype=np.uint8)
@@ -959,16 +979,34 @@ def video_feed():
 
 
 def main():
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Virtual Face Tracker with Hailo')
+    parser.add_argument('--cameras', nargs='+', type=int, default=[0, 1],
+                       help='Camera indices to use (e.g., --cameras 0 for single camera, --cameras 0 1 for dual)')
+    parser.add_argument('--single-camera', type=int, metavar='ID',
+                       help='Use single camera mode (shortcut for --cameras ID)')
+    args = parser.parse_args()
+    
+    # Handle single-camera shortcut
+    if args.single_camera is not None:
+        camera_nums = [args.single_camera]
+    else:
+        camera_nums = args.cameras
+    
     global tracker
     
     print("=" * 60)
-    print("Dual Camera Virtual Face Tracker with Hailo")
+    if len(camera_nums) == 1:
+        print(f"Single Camera Virtual Face Tracker with Hailo (Camera {camera_nums[0]})")
+    else:
+        print("Dual Camera Virtual Face Tracker with Hailo")
     print("=" * 60)
     print("\nThis demonstrates tracking logic WITHOUT moving motors")
     print("Once this works, we'll connect to Klipper\n")
     
     # Create and start tracker
-    tracker = DualCameraTracker(camera_nums=[0, 1])
+    tracker = DualCameraTracker(camera_nums=camera_nums)
     tracker.start()
     
     # Start Flask server

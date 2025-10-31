@@ -18,8 +18,15 @@
 # Run dual camera tracking with Hailo face detection and recognition
 sudo python3 virtual_tracking_dual.py
 
+# Or run with SINGLE camera only (lower CPU usage, no stereo depth)
+sudo python3 virtual_tracking_dual.py --single-camera 0
+
+# Custom camera selection
+sudo python3 virtual_tracking_dual.py --cameras 0 1  # dual camera
+sudo python3 virtual_tracking_dual.py --cameras 1    # camera 1 only
+
 # Then open browser to view: http://localhost:5000
-# Shows both cameras side-by-side with face tracking and name recognition
+# Shows camera(s) with face tracking and name recognition
 ```
 
 ### Enrolling People for Face Recognition
