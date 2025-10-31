@@ -5,11 +5,51 @@
 - 🎤 **Speech-to-Text** - Vosk/Whisper for voice recognition
 - 🔊 **Text-to-Speech** - Piper TTS with voice effects
 - 👁️ **Face Tracking** - Real-time face following with Klipper motor control
+- 🧠 **Face Recognition** - Hailo-accelerated person identification
 - 😊 **Behavior Analysis** - MediaPipe mood & gesture detection
 - 💾 **Conversation Memory** - Context-aware responses
 - 📊 **System Diagnostics** - Self-monitoring and reporting
 
 ## ⚡ Quick Start
+
+### Running the Dual Camera Face Tracker with Recognition
+
+```bash
+# Run dual camera tracking with Hailo face detection and recognition
+sudo python3 virtual_tracking_dual.py
+
+# Then open browser to view: http://localhost:5000
+# Shows both cameras side-by-side with face tracking and name recognition
+```
+
+### Enrolling People for Face Recognition
+
+**Step 1: Capture Photos**
+```bash
+# Capture enrollment photos with live browser preview
+sudo python3 scripts/capture_enrollment_photos.py --name "PersonName" --camera 0
+
+# Open http://localhost:5000 to see yourself
+# Position face in different angles (front, left, right, up, down)
+# Press ENTER to capture each photo (take 5-10 photos)
+# Type 'done' when finished
+```
+
+**Step 2: Enroll the Photos**
+```bash
+# Enroll captured photos into face recognition database
+python3 scripts/enroll_hailo.py --name "PersonName" --images enrollment_photos/PersonName_*.jpg
+
+# The system uses Hailo-accelerated template matching for fast recognition
+```
+
+**Bonus: Manage Enrolled People**
+```bash
+# List all enrolled people
+python3 scripts/enroll_hailo.py --list
+
+# View enrolled people and template counts
+```
 
 ### Running the Voice Assistant
 

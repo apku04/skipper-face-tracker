@@ -1,0 +1,68 @@
+--- follow_face.py.orig	2025-10-28 20:00:00.000000000 +0000
++++ follow_face.py	2025-10-28 20:15:00.000000000 +0000
+@@ -22,8 +22,8 @@
+ import numpy as np
+ import cv2
+ 
+-from gpiozero import DigitalOutputDevice, Device
+-from gpiozero.pins.lgpio import LGPIOFactory
++# Replaced gpiozero with Klipper motor control
++from klipper_motors import create_stepper_controllers, get_motor_controller
+ 
+ # ============================================================================
+ #                      CONFIGURATION & CONSTANTS
+@@ -137,16 +137,8 @@
+ B_DIR = 17
+ B_STEP = 27
+ 
+-# Setup GPIO factory
+-Device.pin_factory = LGPIOFactory()
+-A_dir = DigitalOutputDevice(A_DIR)
+-# keep step pin low by default
+-A_step = DigitalOutputDevice(A_STEP)
+-B_dir = DigitalOutputDevice(B_DIR)
+-# keep step pin low by default
+-B_step = DigitalOutputDevice(B_STEP)
+-
+-# ---------------- Stepper worker ----------------
++# ---------------- OLD Stepper worker (REPLACED) ----------------
++"""
+ class StepperWorker(threading.Thread):
+     def __init__(self, name, dir_pin, step_pin, get_rate, get_dir):
+         super().__init__(daemon=True)
+@@ -195,6 +187,7 @@
+             time.sleep(self.poll_interval)
+         if self.verbose:
+             print(f"[{self.name}] StepperWorker exiting.")
++"""
+ 
+ # ---------------- Axis control ----------------
+ class AxisControl:
+@@ -709,10 +702,12 @@
+         }
+     }
+ 
+-    # Create & start stepper workers
+-    a_worker = StepperWorker("AZ", A_dir, A_step, az_ctrl.get_rate, az_ctrl.get_dir)
+-    b_worker = StepperWorker("ALT", B_dir, B_step, alt_ctrl.get_rate, alt_ctrl.get_dir)
+-    a_worker.start()
+-    b_worker.start()
++    # Initialize Klipper motor control
++    motor = get_motor_controller()
++    if not motor.initialize():
++        print("✗ Failed to initialize Klipper motors")
++        return
++    
++    print("✓ Klipper motors ready")
+ 
+     try:
+@@ -720,10 +715,6 @@
+ 
+     finally:
+         print("[Main] Shutting down...")
+-        a_worker.stop()
+-        b_worker.stop()
+-        a_worker.join(timeout=1.0)
+-        b_worker.join(timeout=1.0)
++        motor.disable_motors()
+         cap.release()

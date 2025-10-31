@@ -1,0 +1,189 @@
+# Sample Klipper Configuration for Face Tracking Robot
+# This is a minimal configuration for using Klipper to control
+# two stepper motors for face tracking (azimuth and altitude)
+
+# MCU Configuration - adjust for your board
+[mcu]
+serial: /dev/serial/by-id/usb-Klipper_stm32f446xx_XXXXXX-if00
+# For USB connection, or use:
+# serial: /dev/ttyAMA0
+# For serial connection
+
+# Stepper X - Azimuth (Pan/Horizontal Movement)
+[stepper_x]
+step_pin: PF13          # Change to your board's X-step pin
+dir_pin: PF12           # Change to your board's X-direction pin
+enable_pin: !PF14       # Change to your board's X-enable pin (! inverts)
+microsteps: 16
+rotation_distance: 1.8  # For 200 steps/rev stepper: 360/200 = 1.8 deg/step
+# For 400 steps/rev: use 0.9
+# For geared system: divide by gear ratio
+
+# Position limits (in degrees)
+position_min: -180
+position_max: 180
+position_endstop: 0
+
+# Homing (optional - comment out if no endstops)
+# endstop_pin: ^PG6      # Endstop pin
+# homing_speed: 50
+# homing_retract_dist: 5
+
+# Stepper Y - Altitude (Tilt/Vertical Movement)
+[stepper_y]
+step_pin: PG0           # Change to your board's Y-step pin
+dir_pin: !PG1           # Change to your board's Y-direction pin (! if reversed)
+enable_pin: !PF15       # Change to your board's Y-enable pin
+microsteps: 16
+rotation_distance: 1.8  # Same calculation as stepper_x
+
+# Position limits (in degrees)
+position_min: -90       # Adjust based on your mechanical limits
+position_max: 90
+position_endstop: 0
+
+# Homing (optional - comment out if no endstops)
+# endstop_pin: ^PG9
+# homing_speed: 50
+# homing_retract_dist: 5
+
+# Dummy Z axis (required by Klipper, but not used)
+[stepper_z]
+step_pin: PF11
+dir_pin: PG3
+enable_pin: !PG5
+microsteps: 16
+rotation_distance: 8
+position_min: 0
+position_max: 1
+position_endstop: 0
+endstop_pin: ^PG10
+
+# Force move - allows movement without homing
+[force_move]
+enable_force_move: True
+
+# Printer settings
+[printer]
+kinematics: none        # We're not using standard 3D printer kinematics
+max_velocity: 300       # Max speed in deg/s (adjust as needed)
+max_accel: 3000         # Max acceleration in deg/s^2
+# max_z_velocity: 5     # Not used for face tracking
+# max_z_accel: 100      # Not used for face tracking
+
+# Virtual SD card for potential future use
+[virtual_sdcard]
+path: ~/gcode_files
+
+# Display (optional - comment out if no display)
+# [display]
+# lcd_type: st7920
+# cs_pin: EXP1_7
+# sclk_pin: EXP1_6
+# sid_pin: EXP1_8
+# encoder_pins: ^EXP1_5, ^EXP1_3
+# click_pin: ^!EXP1_2
+
+# =============================================================================
+# BOARD-SPECIFIC PIN CONFIGURATIONS
+# =============================================================================
+
+# Uncomment the section for your board and update the stepper configs above
+
+# --- BTT Octopus V1.1 (STM32F446) ---
+# [board_pins]
+# aliases:
+#     # Stepper X (Motor 0)
+#     X_STEP=PF13, X_DIR=PF12, X_EN=PF14, X_STOP=PG6,
+#     # Stepper Y (Motor 1)
+#     Y_STEP=PG0, Y_DIR=PG1, Y_EN=PF15, Y_STOP=PG9,
+#     # Stepper Z (Motor 2 - dummy)
+#     Z_STEP=PF11, Z_DIR=PG3, Z_EN=PG5, Z_STOP=PG10
+
+# --- BTT SKR Mini E3 V3 ---
+# [board_pins]
+# aliases:
+#     # Stepper X
+#     X_STEP=PB13, X_DIR=PB12, X_EN=PB14, X_STOP=PC0,
+#     # Stepper Y
+#     Y_STEP=PB10, Y_DIR=PB2, Y_EN=PB11, Y_STOP=PC1,
+#     # Stepper Z (dummy)
+#     Z_STEP=PB0, Z_DIR=PC5, Z_EN=PB1, Z_STOP=PC2
+
+# --- BTT SKR 1.4 Turbo ---
+# [board_pins]
+# aliases:
+#     # Stepper X
+#     X_STEP=P2.2, X_DIR=P2.6, X_EN=P2.1, X_STOP=P1.29,
+#     # Stepper Y
+#     Y_STEP=P0.19, Y_DIR=P0.20, Y_EN=P2.8, Y_STOP=P1.28,
+#     # Stepper Z (dummy)
+#     Z_STEP=P0.22, Z_DIR=P2.11, Z_EN=P0.21, Z_STOP=P1.27
+
+# =============================================================================
+# OPTIONAL: TMC Stepper Driver Configuration
+# =============================================================================
+
+# If using TMC2209 drivers (UART mode), add these sections:
+# Uncomment and configure if you have TMC drivers
+
+# [tmc2209 stepper_x]
+# uart_pin: PC4           # UART pin for X driver
+# run_current: 0.800      # Motor current (amps) - adjust for your motor
+# stealthchop_threshold: 999999  # Enable stealthChop (quiet operation)
+# 
+# [tmc2209 stepper_y]
+# uart_pin: PD11          # UART pin for Y driver
+# run_current: 0.800
+# stealthchop_threshold: 999999
+#
+# [tmc2209 stepper_z]
+# uart_pin: PC6
+# run_current: 0.650
+# stealthchop_threshold: 999999
+
+# =============================================================================
+# OPTIONAL: Input Shaping (for smoother motion)
+# =============================================================================
+
+# [input_shaper]
+# shaper_freq_x: 40       # Tune this for your mechanical system
+# shaper_freq_y: 40
+# shaper_type: mzv
+
+# =============================================================================
+# TUNING NOTES
+# =============================================================================
+
+# 1. Rotation Distance:
+#    - For direct drive: 360 / steps_per_rev
+#    - For geared system: (360 / steps_per_rev) / gear_ratio
+#    - For belt drive: (belt_pitch * pulley_teeth) / steps_per_rev
+
+# 2. Motor Current (TMC drivers):
+#    - Start at 70% of motor rated current
+#    - Increase if motors skip steps
+#    - Decrease if motors get too hot
+
+# 3. Direction:
+#    - Add or remove ! prefix on dir_pin if motor turns wrong way
+#    - Test with: G0 X10 (should move right/clockwise)
+#    -            G0 Y10 (should move up)
+
+# 4. Speed and Acceleration:
+#    - Start conservative: max_velocity=100, max_accel=1000
+#    - Increase gradually while testing for skipped steps
+#    - Higher values = faster tracking but may cause mechanical issues
+
+# =============================================================================
+# SAVE AND RESTART
+# =============================================================================
+
+# After editing this file:
+# 1. Save it as ~/printer.cfg (or update your existing config)
+# 2. Restart Klipper: sudo systemctl restart klipper
+# 3. Check for errors: tail -f /tmp/klippy.log
+# 4. Test motors: 
+#    - Open Mainsail/Fluidd web interface
+#    - Use console to send: SET_KINEMATIC_POSITION X=0 Y=0
+#    - Then test: G0 X10 F3000
