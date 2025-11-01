@@ -1,0 +1,219 @@
+# Alarm System Configuration
+# Defines diagnostics, priorities, and LED status indicators
+
+# LED Patterns Definition
+# Define reusable LED patterns that can be referenced by alarms
+led_patterns:
+  critical_solid:
+    color: [255, 0, 0]      # Red
+    blink: false
+    description: "Solid red - critical issue"
+
+  critical_blink:
+    color: [255, 0, 0]      # Red
+    blink: true
+    blink_rate: 0.5
+    description: "Blinking red - critical error"
+
+  critical_fast_blink:
+    color: [255, 0, 0]      # Red
+    blink: true
+    blink_rate: 0.2
+    description: "Fast blinking red - urgent critical"
+
+  warning_blink:
+    color: [255, 255, 0]    # Yellow
+    blink: true
+    blink_rate: 0.5
+    description: "Blinking yellow - warning"
+
+  warning_slow_blink:
+    color: [255, 255, 0]    # Yellow
+    blink: true
+    blink_rate: 1.0
+    description: "Slow blinking yellow - minor warning"
+
+  info_blink:
+    color: [0, 0, 255]      # Blue
+    blink: true
+    blink_rate: 0.5
+    description: "Blinking blue - information"
+
+  ok_solid:
+    color: [0, 255, 0]      # Green
+    blink: false
+    description: "Solid green - all OK"
+
+  diagnostic_blink:
+    color: [255, 255, 0]    # Yellow
+    blink: true
+    blink_rate: 0.3
+    description: "Fast blinking yellow - running diagnostics"
+
+# Alarm Categories
+# Alarms are grouped by severity and use predefined LED patterns
+alarms:
+# Alarm Categories
+# Alarms are grouped by severity and use predefined LED patterns
+alarms:
+  # CRITICAL ALARMS (Priority 90-100)
+  # Use: critical_solid, critical_blink, critical_fast_blink
+  
+  temperature_critical:
+    priority: 100
+    check: "temperature"
+    condition: "critical"
+    pattern: "critical_solid"  # Reference to led_patterns
+    message: "CRITICAL: CPU temperature above threshold"
+    critical: true
+    enabled: true
+
+  wifi_down:
+    priority: 90
+    check: "wifi"
+    condition: "error"
+    pattern: "critical_blink"
+    message: "CRITICAL: WiFi not connected"
+    critical: true
+    enabled: true
+
+  # WARNING ALARMS (Priority 50-89)
+  # Use: warning_blink, warning_slow_blink
+  
+  temperature_warning:
+    priority: 80
+    check: "temperature"
+    condition: "warning"
+    pattern: "warning_blink"
+    message: "WARNING: CPU temperature elevated"
+    critical: false
+    enabled: true
+
+  klipper_down:
+    priority: 70
+    check: "klipper"
+    condition: "error"
+    pattern: "warning_blink"
+    message: "WARNING: Klipper not accessible"
+    critical: false
+    enabled: true
+
+  camera_error:
+    priority: 60
+    check: "camera"
+    condition: "error"
+    pattern: "warning_slow_blink"
+    message: "WARNING: Camera not detected"
+    critical: false
+    enabled: true
+
+  speaker_error:
+    priority: 55
+    check: "speaker"
+    condition: "error"
+    pattern: "warning_slow_blink"
+    message: "WARNING: Speaker not detected"
+    critical: false
+    enabled: true
+
+  microphone_error:
+    priority: 54
+    check: "microphone"
+    condition: "error"
+    pattern: "warning_slow_blink"
+    message: "WARNING: Microphone not detected"
+    critical: false
+    enabled: true
+
+  # INFO/OK ALARMS (Priority 1-49)
+  # Use: ok_solid, info_blink
+  
+  all_ok:
+    priority: 1
+    check: "all"
+    condition: "ok"
+    pattern: "ok_solid"
+    message: "All systems operational"
+    critical: false
+    enabled: true
+
+# Diagnostic checks configuration
+diagnostics:
+  temperature:
+    enabled: true
+    warning_threshold: 70.0  # °C
+    critical_threshold: 80.0  # °C
+    check_interval: 10  # seconds (during monitoring)
+
+  wifi:
+    enabled: true
+    timeout: 5  # seconds
+    ping_host: "8.8.8.8"
+    ping_count: 1
+
+  klipper:
+    enabled: true
+    host: "localhost"
+    port: 7125  # Moonraker default port
+    timeout: 2  # seconds
+
+  camera:
+    enabled: true
+    devices:
+      - "/dev/video0"
+      - "/dev/video1"
+
+  speaker:
+    enabled: true
+    command: ["aplay", "-l"]
+    timeout: 5
+
+  microphone:
+    enabled: true
+    command: ["arecord", "-l"]
+    timeout: 5
+
+# Boot behavior
+boot:
+  diagnostic_pattern: "diagnostic_blink"  # Reference to led_patterns
+  diagnostic_phase_duration: 10  # Number of blinks before showing final status
+
+# LED GPIO pins
+gpio:
+  red: 23
+  green: 22
+  blue: 27
+
+# Future alarms (disabled by default - enable when implemented)
+future_alarms:
+  disk_full:
+    priority: 85
+    check: "disk_space"
+    condition: "critical"
+    pattern: "critical_blink"
+    message: "CRITICAL: Disk space low"
+    enabled: false
+
+  hailo_error:
+    priority: 75
+    check: "hailo"
+    condition: "error"
+    pattern: "warning_blink"
+    message: "WARNING: Hailo AI accelerator not detected"
+    enabled: false
+
+  face_db_missing:
+    priority: 50
+    check: "face_database"
+    condition: "error"
+    pattern: "warning_slow_blink"
+    message: "WARNING: Face database not found"
+    enabled: false
+
+  network_slow:
+    priority: 45
+    check: "network_speed"
+    condition: "warning"
+    pattern: "info_blink"
+    message: "INFO: Network speed degraded"
+    enabled: false

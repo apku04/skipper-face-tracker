@@ -4,28 +4,58 @@ This directory contains systemd services for the Skipper robot system.
 
 ## Available Services
 
-### 1. boot-status-led.service
-**Purpose:** Turn on yellow LED on boot to indicate system is online.
+### 1. boot-diagnostics.service (RECOMMENDED)
+**Purpose:** Run comprehensive boot diagnostics and display status via RGB LED.
+
+**Features:**
+- Checks WiFi connectivity
+- Tests Klipper/Moonraker connection
+- Verifies camera availability
+- Checks speaker/microphone
+- Monitors CPU temperature
+- Displays status via RGB LED
+- Saves diagnostic logs
+
+**LED Status Indicators:**
+- 🟡 **Blinking Yellow** → Running diagnostics (on boot)
+- 🟢 **Solid Green** → All systems OK
+- 🟡 **Blinking Yellow** → Minor issues detected (camera, audio, etc.)
+- 🔴 **Blinking Red** → Critical issues (WiFi down, hardware failure)
+- 🔴 **Solid Red** → Temperature CRITICAL (>80°C)
 
 **Hardware:**
 - RGB LED connected to GPIO 23 (Red), GPIO 22 (Green), GPIO 27 (Blue)
-- Yellow = Red + Green both ON
 
 **Status:** Ready to install
 
 ---
 
+### 2. boot-status-led.service (DEPRECATED)
+**Purpose:** Simple yellow LED on boot indicator.
+
+**Note:** Use `boot-diagnostics.service` instead for full diagnostic capabilities.
+
+---
+
 ## Quick Install
 
-### Boot Status LED Service
+### Boot Diagnostics Service (Recommended)
+
+```bash
+cd /home/pi/work/skipper/services
+chmod +x install_boot_diagnostics.sh
+./install_boot_diagnostics.sh
+```
+
+This will automatically replace the old boot-status-led service.
+
+### Boot Status LED Service (Legacy)
 
 ```bash
 cd /home/pi/work/skipper/services
 chmod +x install_boot_led.sh
 ./install_boot_led.sh
 ```
-
-The yellow LED should turn on immediately and on every boot.
 
 ---
 
