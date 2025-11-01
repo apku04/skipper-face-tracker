@@ -24,8 +24,20 @@ from queue import Queue
 from flask import Flask, Response, render_template_string
 from picamera2 import Picamera2
 from picamera2.devices import Hailo
-from identity.hailo_person_manager import HailoPersonManager
-from stereo_depth import StereoDepthCalculator
+
+# Local imports (identity is in vision/identity/)
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))  # Add project root
+
+from vision.identity.hailo_person_manager import HailoPersonManager
+
+# Stereo depth is optional (moved to archive)
+try:
+    from stereo_depth import StereoDepthCalculator
+    STEREO_AVAILABLE = True
+except ImportError:
+    STEREO_AVAILABLE = False
 
 # === Configuration ===
 CAMERA_WIDTH = 800
@@ -456,15 +468,18 @@ class DualCameraTracker:
             self.parser_list.append(SCRFDParser())
             self.tracker_list.append(VirtualTracker())
         
-        # Stereo depth calculator
-        self.depth_calculator = StereoDepthCalculator(
-            baseline_cm=10.0,  # Approximate distance between cameras (adjust if needed)
-            focal_length_px=800.0  # Initial estimate, will auto-calibrate
-        )
+        # Stereo depth calculator (optional)
+        if STEREO_AVAILABLE and len(camera_nums) >= 2:
+            self.depth_calculator = StereoDepthCalculator(
+                baseline_cm=10.0,  # Approximate distance between cameras (adjust if needed)
+                focal_length_px=800.0  # Initial estimate, will auto-calibrate
+            )
+        else:
+            self.depth_calculator = None
         self.last_depth = None  # Store last calculated depth
         
         # Face recognition manager (Hailo-based template matching)
-        self.person_manager = HailoPersonManager(db_path="faces_db_hailo.pkl")
+        self.person_manager = HailoPersonManager(db_path="models/face_db/faces_db_hailo.pkl")
         self.recognition_interval = 15  # run recognition every N frames
         self.last_recognition = [None for _ in camera_nums]
         self.last_recognition_time = [0.0 for _ in camera_nums]
@@ -574,6 +589,9 @@ class DualCameraTracker:
                     print(f"Camera {cam_num}: Empty frame!")
                     continue
                 
+                # Rotate frame 180 degrees
+                frame = cv2.rotate(frame, cv2.ROTATE_180)
+                
                 # Resize frame for Hailo (640x640) while keeping original for display
                 frame_hailo = cv2.resize(frame, (HAILO_WIDTH, HAILO_HEIGHT))
                 
@@ -592,7 +610,9 @@ class DualCameraTracker:
                     if faces and frame_count % 60 == 0:
                         print(f"Camera {cam_num}: ✓ Hailo SCRFD detected {len(faces)} face(s)")
                 
-                # Fallback to YuNet if no Hailo detections
+                # YuNet fallback disabled - Hailo SCRFD is sufficient and more reliable
+                # (Uncomment below if you want CPU fallback when Hailo fails)
+                """
                 if not faces and self.face_detector:
                     try:
                         # YuNet expects BGR format
@@ -626,6 +646,7 @@ class DualCameraTracker:
                         if frame_count % 30 == 0:
                             print(f"Camera {cam_num}: YuNet error - {cv_err}")
                         faces = []
+                """
                 
                 # Smart face selection with temporal tracking
                 face_box = None
@@ -744,15 +765,16 @@ class DualCameraTracker:
             w2 = x2_cam1 - x1_cam1
             h2 = y2_cam1 - y1_cam1
             
-            # Calculate depth
-            depth_result = self.depth_calculator.calculate_depth(
-                x1, y1, w1, h1,  # Camera 0
-                x1_cam1, y1_cam1, w2, h2  # Camera 1
-            )
-            
-            if depth_result:
-                self.last_depth = depth_result
-                return depth_result
+            # Calculate depth (if stereo is available)
+            if self.depth_calculator:
+                depth_result = self.depth_calculator.calculate_depth(
+                    x1, y1, w1, h1,  # Camera 0
+                    x1_cam1, y1_cam1, w2, h2  # Camera 1
+                )
+                
+                if depth_result:
+                    self.last_depth = depth_result
+                    return depth_result
             
         except Exception as e:
             pass
@@ -855,7 +877,7 @@ class DualCameraTracker:
         depth_info = self._calculate_stereo_depth()
         
         # Add depth overlay in center between cameras
-        if depth_info:
+        if depth_info and self.depth_calculator:
             x_cm, y_cm, z_cm = depth_info
             depth_text = f"Distance: {z_cm:.0f}cm"
             position_text = self.depth_calculator.format_position(x_cm, y_cm, z_cm)

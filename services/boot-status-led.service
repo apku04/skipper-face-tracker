@@ -1,0 +1,22 @@
+[Unit]
+Description=Boot Status LED (Yellow LED on boot)
+After=multi-user.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/pi/work/skipper
+ExecStart=/usr/bin/python3 /home/pi/work/skipper/services/boot_status_led.py
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+# Graceful shutdown
+TimeoutStopSec=10
+KillMode=mixed
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target
