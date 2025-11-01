@@ -59,6 +59,126 @@ chmod +x install_boot_led.sh
 
 ---
 
+## Using Boot Diagnostics
+
+### Understanding LED Status
+
+The boot diagnostics service runs checks on every boot and displays the highest priority issue via the RGB LED:
+
+| LED Pattern | Meaning | Priority | Action Needed |
+|------------|---------|----------|---------------|
+| 🟡 Fast Blinking Yellow | Running diagnostics | - | Wait ~5 seconds |
+| 🟢 Solid Green | All systems OK | Lowest | None - system healthy |
+| 🟡 Slow Blinking Yellow | Minor issues | Medium | Check logs for warnings |
+| 🟡 Blinking Yellow | Warnings detected | Medium-High | Check diagnostics log |
+| 🔴 Blinking Red | Critical issues | High | WiFi down or hardware failure |
+| 🔴 Solid Red | Temperature CRITICAL | Highest | Shutdown and cool system |
+
+### Viewing Diagnostic Results
+
+**Check the latest diagnostic log:**
+```bash
+cat logs/boot_diagnostics_*.log | tail -20
+```
+
+**View live service logs:**
+```bash
+journalctl -u boot-diagnostics.service -f
+```
+
+**View logs since last boot:**
+```bash
+journalctl -u boot-diagnostics.service -b
+```
+
+**Check current service status:**
+```bash
+sudo systemctl status boot-diagnostics.service
+```
+
+### Re-running Diagnostics
+
+To re-run diagnostics without rebooting:
+
+```bash
+sudo systemctl restart boot-diagnostics.service
+```
+
+Watch the LED cycle through diagnostics and show the new status.
+
+### Troubleshooting Issues
+
+#### Yellow Blinking - Minor Issues
+
+Common causes:
+- Speaker not detected
+- Microphone not detected  
+- Camera not found
+- Klipper not accessible
+
+**Action:** Check the diagnostic log to see which component failed:
+```bash
+cat logs/boot_diagnostics_*.log
+```
+
+#### Red Blinking - Critical Issues
+
+**WiFi Down:**
+```bash
+# Check WiFi status
+nmcli device status
+
+# Reconnect WiFi
+nmcli device wifi rescan
+nmcli device wifi connect "YOUR_SSID" password "YOUR_PASSWORD"
+```
+
+#### Red Solid - Temperature Critical
+
+**Immediate action required:**
+```bash
+# Check temperature
+vcgencmd measure_temp
+
+# If above 80°C, shutdown immediately
+sudo shutdown -h now
+```
+
+Check cooling:
+- Is the fan working?
+- Are vents blocked?
+- Is the heatsink properly mounted?
+
+### Customizing Diagnostic Checks
+
+Edit the alarm configuration to enable/disable checks:
+
+```bash
+nano alarms/alarm_config.yaml
+```
+
+To disable a diagnostic (e.g., speaker check):
+```yaml
+diagnostics:
+  speaker:
+    enabled: false  # Changed from true
+```
+
+Then restart the service:
+```bash
+sudo systemctl restart boot-diagnostics.service
+```
+
+### Adding Custom Diagnostics
+
+See `alarms/README.md` for detailed instructions on:
+- Adding new diagnostic checks
+- Creating new alarm patterns
+- Adjusting priority levels
+- Customizing LED patterns
+
+---
+
 ## Manual Installation (Generic Process)
 
 This process works for any systemd service:
