@@ -1,0 +1,35 @@
+# Sensor Configuration
+sensors:
+  # I2C settings
+  i2c:
+    bus: 1
+    timeout: 1.0
+  
+  # TCA9548A Multiplexer
+  multiplexer:
+    address: 0x70
+    channels: 8
+    
+  # SHT3x Temperature & Humidity
+  sht3x:
+    enabled: true
+    channel: 0
+    address: 0x44
+    measurement_mode: "high_repeatability"
+    
+  # BMP280 Temperature & Pressure
+  bmp280:
+    enabled: true
+    channel: 1
+    address: 0x76
+    oversampling: 1  # 1x oversampling
+    
+  # BME680 Air Quality (optional)
+  bme680:
+    enabled: false
+    channel: 2
+    address: 0x77
+    
+  # Reading settings
+  update_rate: 2.0  # seconds between readings
+  averaging: true   # average temperature from multiple sensors

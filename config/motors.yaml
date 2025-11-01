@@ -1,0 +1,34 @@
+# Motor Configuration
+motors:
+  # Klipper connection
+  klipper:
+    host: "localhost"
+    port: 7125
+    timeout: 5
+  
+  # Pan motor (X axis)
+  pan:
+    axis: "x"
+    limits:
+      min: -180
+      max: 180
+    speed: 50
+    acceleration: 100
+    homing_speed: 50
+    
+  # Tilt motor (Y axis)
+  tilt:
+    axis: "y"
+    limits:
+      min: -90
+      max: 90
+    speed: 40
+    acceleration: 80
+    homing_speed: 40
+    
+  # Face following behavior
+  following:
+    enabled: true
+    smoothing: 0.3  # 0-1, higher = smoother but slower
+    deadzone: 20    # pixels, ignore small movements
+    update_rate: 10 # Hz
