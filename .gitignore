@@ -24,8 +24,12 @@ Thumbs.db
 *.hef
 *.caffemodel
 
-# Logs
-*.log
+# Logs - Keep README but ignore log files
+logs/*.log
+logs/*.csv
+logs/*.txt
+logs/*.json
+!logs/README.md
 
 # Enrollment photos and face database
 enrollment_photos/

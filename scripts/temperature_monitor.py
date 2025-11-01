@@ -9,7 +9,13 @@ import smbus2
 import struct
 import signal
 import sys
+import os
 from datetime import datetime
+from pathlib import Path
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from utils.logging_config import get_data_log_path
 
 # SHT3x Configuration
 SHT3X_ADDR = 0x44
@@ -17,12 +23,15 @@ I2C_BUS = 1
 
 # Global flag for graceful shutdown
 running = True
+log_file = None
 
 def signal_handler(signum, frame):
     """Handle shutdown signals"""
-    global running
+    global running, log_file
     print("\n\nShutting down temperature monitor...")
     running = False
+    if log_file:
+        log_file.close()
     sys.exit(0)
 
 def read_sht3x_temp_humidity():
@@ -94,11 +103,13 @@ def format_temp_bar(temp, min_temp=20, max_temp=80):
 
 def display_header():
     """Display monitoring header"""
+    log_dir = Path(__file__).parent.parent / "logs"
     print("\n" + "=" * 80)
     print("  TEMPERATURE MONITOR - SHT3x (Ambient) + CPU")
     print("=" * 80)
     print(f"  SHT3x Address: 0x{SHT3X_ADDR:02X} (I2C Bus {I2C_BUS})")
     print(f"  Update Interval: 2 seconds")
+    print(f"  Log Directory: {log_dir}")
     print(f"  Press Ctrl+C to stop")
     print("=" * 80)
     print()
@@ -106,11 +117,19 @@ def display_header():
     print("-" * 80)
 
 def main():
-    global running
+    global running, log_file
     
     # Setup signal handlers
     signal.signal(signal.SIGTERM, signal_handler)
     signal.signal(signal.SIGINT, signal_handler)
+    
+    # Create log file with timestamp using central logging config
+    log_filename = get_data_log_path("temperature", extension="csv")
+    log_file = open(log_filename, 'w')
+    
+    # Write CSV header to log file
+    log_file.write("timestamp,ambient_temp_c,cpu_temp_c,humidity_percent,delta_temp_c\n")
+    log_file.flush()
     
     # Display header
     display_header()
@@ -123,6 +142,7 @@ def main():
         while running:
             # Get current time
             current_time = datetime.now().strftime("%H:%M:%S")
+            current_timestamp = datetime.now().isoformat()
             
             # Read SHT3x sensor
             ambient_temp, humidity = read_sht3x_temp_humidity()
@@ -136,7 +156,20 @@ def main():
             if cpu_temp is not None:
                 cpu_temps.append(cpu_temp)
             
-            # Format output
+            # Calculate delta (CPU - Ambient)
+            delta = None
+            if ambient_temp is not None and cpu_temp is not None:
+                delta = cpu_temp - ambient_temp
+            
+            # Write to log file (CSV format)
+            log_file.write(f"{current_timestamp},"
+                          f"{ambient_temp if ambient_temp is not None else 'NA'},"
+                          f"{cpu_temp if cpu_temp is not None else 'NA'},"
+                          f"{humidity if humidity is not None else 'NA'},"
+                          f"{delta if delta is not None else 'NA'}\n")
+            log_file.flush()
+            
+            # Format output for display
             if ambient_temp is not None:
                 ambient_str = f"{ambient_temp:5.2f}°C {format_temp_bar(ambient_temp, 15, 50)}"
             else:
@@ -152,9 +185,7 @@ def main():
             else:
                 humidity_str = "ERROR"
             
-            # Calculate delta (CPU - Ambient)
-            if ambient_temp is not None and cpu_temp is not None:
-                delta = cpu_temp - ambient_temp
+            if delta is not None:
                 delta_str = f"Δ {delta:+5.2f}°C"
             else:
                 delta_str = ""
@@ -192,7 +223,12 @@ def main():
                   f"Max: {max(deltas):.2f}°C  "
                   f"Avg: {sum(deltas)/len(deltas):.2f}°C")
         
+        print(f"\n  Log saved to: {log_filename}")
         print("=" * 80)
+        
+        # Close log file
+        if log_file:
+            log_file.close()
 
 if __name__ == "__main__":
     main()

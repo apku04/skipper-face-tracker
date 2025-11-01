@@ -96,7 +96,7 @@ def main():
     parser.add_argument(
         '--log-file',
         type=str,
-        default='data/logs/skipper.log',
+        default='logs/skipper.log',
         help='Log file path'
     )
     
