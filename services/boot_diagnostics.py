@@ -302,7 +302,7 @@ def check_speaker():
         return False
 
 def check_microphone():
-    """Check if microphone/audio input is available"""
+    """Check if microphone/audio input is available (excluding speaker-only devices)"""
     if not alarm_manager.is_diagnostic_enabled('microphone'):
         return True
     
@@ -316,13 +316,40 @@ def check_microphone():
             timeout=mic_config.get('timeout', 5)
         )
         
-        if result.returncode == 0 and 'card' in result.stdout.lower():
-            diagnostics['microphone'] = {
-                'status': 'ok',
-                'message': 'Audio input device detected'
-            }
-            logger.info(diagnostics['microphone']['message'])
-            return True
+        if result.returncode == 0 and result.stdout:
+            # Check if there are any dedicated microphone devices
+            # Exclude USB Audio devices that are primarily speakers
+            output = result.stdout.lower()
+            
+            # Look for dedicated microphone keywords
+            mic_keywords = ['microphone', 'mic', 'respeaker', 'webcam', 'usb audio device']
+            has_dedicated_mic = any(keyword in output for keyword in mic_keywords)
+            
+            # Check if only USB speaker with input (AB13X, etc.)
+            is_only_speaker = 'usb audio' in output and not has_dedicated_mic
+            
+            if has_dedicated_mic:
+                diagnostics['microphone'] = {
+                    'status': 'ok',
+                    'message': 'Dedicated microphone detected'
+                }
+                logger.info(diagnostics['microphone']['message'])
+                return True
+            elif is_only_speaker:
+                diagnostics['microphone'] = {
+                    'status': 'error',
+                    'message': 'No dedicated microphone found (only speaker input interface)'
+                }
+                logger.warning(diagnostics['microphone']['message'])
+                return False
+            else:
+                # Generic audio input found
+                diagnostics['microphone'] = {
+                    'status': 'ok',
+                    'message': 'Audio input device detected'
+                }
+                logger.info(diagnostics['microphone']['message'])
+                return True
         else:
             diagnostics['microphone'] = {
                 'status': 'error',
