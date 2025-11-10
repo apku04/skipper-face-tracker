@@ -61,6 +61,17 @@ chmod +x install_boot_led.sh
 
 ## Using Boot Diagnostics
 
+### Service Behavior
+
+The boot diagnostics service is configured as a **oneshot** service that:
+- Runs automatically on every boot
+- Performs diagnostic checks (~10 seconds)
+- Displays the LED status for 30 seconds
+- Turns off the LED and exits cleanly
+- Creates a timestamped log file in `logs/boot_diagnostics_YYYYMMDD_HHMMSS.log`
+
+**Note:** The service status will show "inactive (dead)" after completion - this is normal for oneshot services. A new log file confirms it ran successfully.
+
 ### Understanding LED Status
 
 The boot diagnostics service runs checks on every boot and displays the highest priority issue via the RGB LED:

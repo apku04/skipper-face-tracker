@@ -25,6 +25,7 @@ except ImportError:
 
 from utils.logging_config import get_logger, get_data_log_path
 from alarms.alarm_manager import AlarmManager
+from utils import oled_display
 
 # Global state
 running = True
@@ -394,14 +395,23 @@ def save_diagnostics_log():
     
     logger.info(f"Diagnostics log saved to: {log_file}")
 
-def display_alarm_led(alarm_config):
-    """Display LED pattern based on alarm configuration"""
+def display_alarm_led(alarm_config, duration: float = None):
+    """Display LED pattern based on alarm configuration
+    
+    Args:
+        alarm_config: Alarm configuration dict or None
+        duration: How long to display the LED pattern in seconds (None = run indefinitely)
+    """
     global running
+    
+    end_time = time.time() + duration if duration else None
     
     if not alarm_config:
         # Default: green solid
         set_led_rgb(0, 255, 0)
         while running:
+            if end_time and time.time() >= end_time:
+                break
             time.sleep(1)
         return
     
@@ -412,6 +422,8 @@ def display_alarm_led(alarm_config):
         # Blinking pattern
         blink_rate = led_pattern['blink_rate']
         while running:
+            if end_time and time.time() >= end_time:
+                break
             set_led_rgb(r, g, b)
             time.sleep(blink_rate)
             led_off()
@@ -420,6 +432,8 @@ def display_alarm_led(alarm_config):
         # Solid pattern
         set_led_rgb(r, g, b)
         while running:
+            if end_time and time.time() >= end_time:
+                break
             # For temperature critical, recheck periodically
             if 'temperature' in alarm_config.get('check', ''):
                 time.sleep(10)
@@ -428,7 +442,8 @@ def display_alarm_led(alarm_config):
                 _, new_alarm = alarm_manager.get_highest_priority_alarm(diagnostics)
                 if new_alarm != alarm_config:
                     # Status changed, update LED
-                    return display_alarm_led(new_alarm)
+                    remaining = max(0, end_time - time.time()) if end_time else None
+                    return display_alarm_led(new_alarm, duration=remaining)
             else:
                 time.sleep(1)
 
@@ -482,7 +497,18 @@ def main():
     # Phase 2: Save diagnostics results
     save_diagnostics_log()
     
-    # Phase 3: Determine and display highest priority alarm
+    # Phase 3: Display diagnostics on OLED
+    logger.info("Displaying diagnostics on OLED...")
+    try:
+        if oled_display.init_display():
+            oled_display.show_status(diagnostics)
+            logger.info("OLED display updated")
+        else:
+            logger.warning("Failed to initialize OLED display")
+    except Exception as e:
+        logger.warning(f"OLED display error: {e}")
+    
+    # Phase 4: Determine and display highest priority alarm
     alarm_name, alarm_config = alarm_manager.get_highest_priority_alarm(diagnostics)
     
     if alarm_config:
@@ -491,8 +517,52 @@ def main():
     else:
         logger.info("No active alarms, all systems OK")
     
-    # Display the appropriate LED pattern
-    display_alarm_led(alarm_config)
+    # Phase 5: Continuous monitoring with LED display
+    logger.info("Starting continuous monitoring (re-check every 5 minutes)...")
+    
+    recheck_interval = 300  # 5 minutes in seconds
+    last_check_time = time.time()
+    
+    while running:
+        # Display current alarm status
+        display_alarm_led(alarm_config, duration=recheck_interval)
+        
+        if not running:
+            break
+            
+        # Re-run diagnostics every 5 minutes
+        logger.info("Re-running diagnostics...")
+        check_temperature()
+        check_wifi()
+        check_klipper()
+        check_camera()
+        check_speaker()
+        check_microphone()
+        
+        # Save updated diagnostics
+        save_diagnostics_log()
+        
+        # Update OLED display with new status
+        try:
+            oled_display.show_status(diagnostics)
+        except Exception as e:
+            logger.warning(f"OLED update error: {e}")
+        
+        # Check if alarm status changed
+        new_alarm_name, new_alarm_config = alarm_manager.get_highest_priority_alarm(diagnostics)
+        
+        if new_alarm_name != alarm_name:
+            logger.info(f"Status changed: {alarm_name} -> {new_alarm_name}")
+            alarm_name = new_alarm_name
+            alarm_config = new_alarm_config
+            
+            if alarm_config:
+                logger.info(f"New alarm: {alarm_name} (priority: {alarm_config.get('priority')})")
+                logger.info(f"Message: {alarm_config.get('message')}")
+            else:
+                logger.info("Issue resolved - all systems OK")
+        
+        last_check_time = time.time()
 
 if __name__ == "__main__":
     main()
