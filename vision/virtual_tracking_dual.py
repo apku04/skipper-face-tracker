@@ -30,7 +30,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))  # Add project root
 
-from vision.identity.hailo_person_manager import HailoPersonManager
+from vision.identity.stable_person_manager import StablePersonManager
 
 # Stereo depth is optional (moved to archive)
 try:
@@ -478,8 +478,8 @@ class DualCameraTracker:
             self.depth_calculator = None
         self.last_depth = None  # Store last calculated depth
         
-        # Face recognition manager (Hailo-based template matching)
-        self.person_manager = HailoPersonManager(db_path="models/face_db/faces_db_hailo.pkl")
+        # Face recognition manager (Stable CPU-based, no crashes)
+        self.person_manager = StablePersonManager(db_path="models/face_db/faces_db_stable.pkl")
         self.recognition_interval = 15  # run recognition every N frames
         self.last_recognition = [None for _ in camera_nums]
         self.last_recognition_time = [0.0 for _ in camera_nums]
@@ -502,6 +502,65 @@ class DualCameraTracker:
         self.running = False
         self.latest_frames = [None, None]
         self.fps_list = [0.0, 0.0]
+    
+    def _normalize_face_crop(self, face_crop: np.ndarray, target_size: int = 112) -> np.ndarray:
+        """
+        Normalize face crop to square, properly sized image for recognition.
+        Reduces background leakage and improves recognition accuracy.
+        
+        Args:
+            face_crop: Raw face crop from detection (may be non-square)
+            target_size: Output size (square)
+        
+        Returns:
+            Normalized square face crop
+        """
+        if face_crop is None or face_crop.size == 0:
+            return None
+        
+        h, w = face_crop.shape[:2]
+        
+        # Make it square by taking center crop
+        if h > w:
+            # Tall image - crop height
+            diff = h - w
+            y_start = diff // 2
+            face_crop = face_crop[y_start:y_start+w, :]
+        elif w > h:
+            # Wide image - crop width
+            diff = w - h
+            x_start = diff // 2
+            face_crop = face_crop[:, x_start:x_start+h]
+        
+        # Resize to target size
+        face_crop = cv2.resize(face_crop, (target_size, target_size), interpolation=cv2.INTER_LINEAR)
+        
+        return face_crop
+    
+    def _identify_with_threshold(self, face_crop: np.ndarray, min_score: float = 0.5) -> tuple:
+        """
+        Identify face with strict confidence threshold using deep learning.
+        
+        Args:
+            face_crop: Raw face crop from detection
+            min_score: Minimum cosine similarity score:
+                      - 0.6+ = strict (best for family members)
+                      - 0.5 = moderate (recommended default)
+                      - 0.4 = loose (may confuse similar faces)
+        
+        Returns:
+            Tuple of (name or None, confidence_score)
+        """
+        try:
+            # Deep learning doesn't need our normalization - InsightFace handles it
+            # Just pass the face crop directly
+            name, score = self.person_manager.identify_with_score(face_crop, threshold=min_score)
+            
+            return name, score
+            
+        except Exception as e:
+            print(f"⚠ Recognition error: {e}")
+            return None, 0.0
         
     def start(self):
         """Start cameras and Hailo"""
@@ -689,42 +748,57 @@ class DualCameraTracker:
                 # Update tracker (applies smoothing)
                 tracking_info = tracker.update(face_box)
 
-                # Periodic face recognition (CPU) to identify person
+                # Periodic face recognition with strict threshold
                 name = None
+                confidence = 0.0
                 try:
                     if face_box is not None and frame_count % self.recognition_interval == 0:
                         x, y, w, h = face_box
-                        # clamp
-                        x = max(0, x); y = max(0, y)
+                        # Clamp to frame boundaries
+                        x = max(0, x)
+                        y = max(0, y)
                         face_crop = frame[y:y+h, x:x+w]
+                        
                         if face_crop.size != 0:
-                            # frame is RGB already
-                            identified = self.person_manager.identify(face_crop)
-                            if identified:
-                                name = identified
-                                self.last_recognition[camera_idx] = name
+                            # Deep learning recognition with cosine similarity threshold
+                            # 0.5 = moderate, 0.6 = strict for family members
+                            name_found, score = self._identify_with_threshold(face_crop, min_score=0.5)
+                            confidence = score
+                            
+                            if name_found:
+                                # Confident match - use it
+                                name = name_found
+                                self.last_recognition[camera_idx] = name_found
                                 self.last_recognition_time[camera_idx] = time.time()
                             else:
-                                # keep previous if still recent
-                                if time.time() - self.last_recognition_time[camera_idx] < 5.0:
+                                # Not confident enough - only use cached name briefly
+                                if time.time() - self.last_recognition_time[camera_idx] < 3.0:
                                     name = self.last_recognition[camera_idx]
                                 else:
                                     name = None
                     else:
-                        # use cached name if recent
-                        if time.time() - self.last_recognition_time[camera_idx] < 5.0:
+                        # Use cached name if still fresh (shorter 3s window)
+                        if time.time() - self.last_recognition_time[camera_idx] < 3.0:
                             name = self.last_recognition[camera_idx]
-                except Exception:
+                        else:
+                            name = None
+                except Exception as e:
+                    print(f"⚠ Recognition exception: {e}")
                     name = None
+                    confidence = 0.0
 
                 # Draw visualization
                 vis_frame = self._draw_visualization(frame.copy(), tracking_info)
 
-                # Overlay identity if available
+                # Overlay identity if available (with confidence score)
                 if name and tracking_info.get('inner_box'):
                     try:
                         x1, y1, x2, y2 = tracking_info['inner_box']
-                        label = name
+                        # Show name and confidence score
+                        if confidence > 0:
+                            label = f"{name} ({confidence:.2f})"
+                        else:
+                            label = name
                         cv2.putText(vis_frame, label, (x1, max(y1-10, 20)),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
                     except Exception:
